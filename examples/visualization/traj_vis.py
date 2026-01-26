@@ -37,7 +37,7 @@ if __name__ == "__main__":
         )
 
     # Optional, plot target
-    target = np.array(results[0]["target"])
+    target = np.array(results[0]["target"][:3])
     ax.scatter(
         target[0],
         target[1],
