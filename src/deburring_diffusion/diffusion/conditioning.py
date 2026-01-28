@@ -4,7 +4,7 @@ from torch import Tensor
 from deburring_diffusion.diffusion.positional_encoding import PositionalEncoding
 
 
-class ConditioningEncoderDiffusionPolicy(nn.Module):
+class ConditioningEncoder(nn.Module):
     def __init__(
         self,
         condition_shapes: dict[str, int],

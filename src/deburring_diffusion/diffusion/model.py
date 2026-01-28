@@ -5,17 +5,17 @@ from deburring_diffusion.diffusion.transformer_encoder_decoder import (
     TransformerDiffusionEncoderDecoder,
 )
 from deburring_diffusion.diffusion.conditioning import (
-    ConditioningEncoderDiffusionPolicy,
+    ConditioningEncoder,
 )
 
 
-class ModelSlotAttention(DiffusionMotion):
+class Model(DiffusionMotion):
     def __init__(self) -> None:
         """
         Model that uses transformer inside diffusion.
         """
         # Conditioning encoder
-        conditioning_encoder = ConditioningEncoderDiffusionPolicy(
+        conditioning_encoder = ConditioningEncoder(
             condition_shapes={
                 "q0": 7,
                 "goal": 7,
