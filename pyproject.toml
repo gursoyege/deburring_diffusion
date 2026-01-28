@@ -15,18 +15,11 @@ dependencies = [
     "einops>=0.8.1",
     "matplotlib>=3.9.4",
     "meshcat>=0.3.2",
+    "robomeshcat>=1.1.4",
+    "example-robot-data-loaders",
     "natsort>=8.4.0",
     "proxsuite!=0.7.2.post1",
     "pytorch-lightning>=2.5.5",
-    "torch>=2.8.0",
-    "torchvision>=0.23.0",
+    "torch>=2.5.0", 
+    "torchvision>=0.20.0",  
 ]
-
-[[tool.uv.index]]
-explicit = true
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-
-[tool.uv.sources]
-torch = [ { index = "pytorch-cpu" } ]
-torchvision = [ { index = "pytorch-cpu" } ]
