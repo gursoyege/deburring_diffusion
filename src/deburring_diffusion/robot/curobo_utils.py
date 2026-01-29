@@ -1,14 +1,12 @@
 import pathlib
 from typing import List
-import torch
-from curobo.types.base import TensorDeviceType
+
 import hppfcl
-import pinocchio as pin
 import numpy as np
-
-
+import pinocchio as pin
+import torch
 from curobo.geom.sdf.world import CollisionCheckerType
-from curobo.geom.types import WorldConfig, Cuboid
+from curobo.rollout.cost.pose_cost import PoseCostMetric
 from curobo.types.base import TensorDeviceType
 from curobo.types.math import Pose
 from curobo.types.robot import JointState
@@ -17,13 +15,7 @@ from curobo.wrap.reacher.motion_gen import (
     MotionGenConfig,
     MotionGenPlanConfig,
 )
-from curobo.util_file import (
-    join_path,
-    load_yaml,
-    get_robot_configs_path,
-    get_world_configs_path,
-)
-from curobo.rollout.cost.pose_cost import PoseCostMetric
+
 
 def get_device_args():
     # choose CUDA if available, otherwise CPU
@@ -32,7 +24,6 @@ def get_device_args():
 
 
 tensor_args = get_device_args()
-
 
 
 def parser_collision_model(collision_model) -> dict:
@@ -137,7 +128,6 @@ def create_motion_gen_curobo(
 
 
 def create_motion_gen_plan_config():
-
     reach_vec_weight = tensor_args.to_device([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
     pose_metric = PoseCostMetric(
@@ -177,9 +167,7 @@ def plan_with_curobo(
         ).unsqueeze(0),
         quaternion=torch.tensor(
             [w, x, y, z], device=tensor_args.device, dtype=torch.float32
-        ).unsqueeze(
-            0
-        ),  # Different convention for quaternions
+        ).unsqueeze(0),  # Different convention for quaternions
     )
 
     result = motion_gen.plan_single(start_state, goal_pose_curobo, plan_cfg)
