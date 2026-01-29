@@ -1,90 +1,129 @@
-import torch
-import numpy as np
-import json
+"""
+Visualize sampled diffusion trajectories in MeshCat.
+
+This script:
+1. Loads a trained diffusion model
+2. Samples trajectories for a given start configuration and goal
+3. Visualizes the trajectories in MeshCat with the robot and environment
+"""
+
 import pathlib
+
+import numpy as np
 import pinocchio as pin
-from robomeshcat import Scene, Object, Robot
 
-from deburring_diffusion.robot.panda_env_loader import load_reduced_panda
-from deburring_diffusion.robot.traj_gen_utils import from_trajectory_to_ee_poses, store_results
-from deburring_diffusion.diffusion.model import Model 
+from deburring_diffusion.robot.traj_gen_utils import store_results
+from deburring_diffusion.robot.visualization_utils import (
+    load_diffusion_model,
+    prepare_conditioning,
+    sample_trajectories,
+    setup_environment,
+    setup_scene,
+    visualize_trajectory,
+)
 
-if __name__ == "__main__":
-    # 1. Setup Environment 
-    rmodel, cmodel, vmodel = load_reduced_panda()
-    rdata = rmodel.createData()
-    vdata = vmodel.createData()
+# Configuration
+CHECKPOINT_PATH = (
+    "/workspaces/deburring_diffusion/results/diffusion/"
+    "lightning_logs/version_0/checkpoints/epoch=99-step=700.ckpt"
+)
+MODEL_PATH = pathlib.Path("/workspaces/deburring_diffusion/models")
+OBJ_FILE = MODEL_PATH / "pylone.obj"
 
-    q_start = np.array([0.0, -0.4, 0.0, -0.2, 0.0, 1.57, 0.79])
-    target_se3 = pin.SE3(np.eye(3), np.array([0.35, 0.4, 0.7]))
-    target_xyzquat = pin.SE3ToXYZQUAT(target_se3) # [x, y, z, qx, qy, qz, qw]
-    pylone_pose = pin.XYZQUATToSE3([0.45, -0.116, 0.739, 0.0, 0.0, 0.0, 1.0])
+Q_START = np.array([0.0, -0.4, 0.0, -0.2, 0.0, 1.57, 0.79])
+TARGET_POSITION = np.array([0.35, 0.4, 0.7])
+PYLONE_POSE = pin.XYZQUATToSE3([0.45, -0.116, 0.739, 0.0, 0.0, 0.0, 1.0])
 
-    # Setting up the scene with the robot and the pylone object
-    obj_path = pathlib.Path(__file__).parent.parent / "models"
-    obj_file = obj_path / "pylone.obj"
+N_SAMPLES = 5
+SEQ_LENGTH = 50
 
-    # 2. Load the Trained Diffusion Model
-    model = Model.load_from_checkpoint("/workspaces/deburring_diffusion/results/diffusion/lightning_logs/version_0/checkpoints/epoch=99-step=700.ckpt")
-    model.eval()
-    model.cuda()
 
-    # 3. Prepare Conditioning Tensor
-    # We concatenate q_start (7) and target (7) = 14 dims
-    cond_dict = {
-            "q0": torch.from_numpy(q_start).float().unsqueeze(0).cuda(),      # (1, 7)
-            "goal": torch.from_numpy(target_xyzquat).float().unsqueeze(0).cuda() # (1, 7)
-        }
-    # Shape: (bs=1, n_tokens=1, dim=14)
+def main() -> None:
+    """Main execution function."""
+    print("=" * 70)
+    print("Diffusion Trajectory Visualization in MeshCat")
+    print("=" * 70)
 
-    # 4. Sample from Diffusion
-    n_samples = 1 # How many trajectories to generate for this one goal
-    results = []
+    # 1. Setup environment
+    print("\n[1/6] Setting up environment...")
+    rmodel, rdata, cmodel, cdata, vmodel, vdata = setup_environment()
 
-    print(f"Sampling {n_samples} trajectories from Diffusion...")
-    with torch.no_grad():
-        sampled_trajs = model.sample(
-            cond=cond_dict,
-            bs=n_samples,
-            seq_length=50, # Matches your cuRobo resampling T=50
-            configuration_size=rmodel.nq
+    # 2. Setup target and conditioning
+    print("[2/6] Preparing target and conditioning...")
+    target_se3 = pin.SE3(np.eye(3), TARGET_POSITION)
+    target_xyzquat = pin.SE3ToXYZQUAT(target_se3)
+
+    cond_dict = prepare_conditioning(
+        q_start=Q_START,
+        target_se3=target_se3,
+    )
+
+    # 3. Load diffusion model
+    print("[3/6] Loading diffusion model...")
+    model = load_diffusion_model(CHECKPOINT_PATH)
+
+    # 4. Sample trajectories
+    print(f"[4/6] Sampling {N_SAMPLES} trajectory(ies)...")
+    sampled_trajs = sample_trajectories(
+        model=model,
+        cond_dict=cond_dict,
+        n_samples=N_SAMPLES,
+        seq_length=SEQ_LENGTH,
+        configuration_size=rmodel.nq,
+    )
+
+    # 5. Setup MeshCat scene
+    print("[5/6] Setting up MeshCat scene...")
+    scene, robot = setup_scene(
+        rmodel=rmodel,
+        rdata=rdata,
+        vmodel=vmodel,
+        vdata=vdata,
+        obj_file=OBJ_FILE,
+        target_se3=target_se3,
+        pylone_pose=PYLONE_POSE,
+    )
+
+    print(f"\n{'=' * 70}")
+    print("MeshCat visualization ready!")
+    print(f"{'=' * 70}")
+    print("Robot: Panda")
+    print(f"Start configuration: {Q_START}")
+    print(f"Target position: {TARGET_POSITION}")
+    print(f"Trajectory length: {SEQ_LENGTH} steps")
+    print(f"Number of samples: {N_SAMPLES}")
+    print(f"{'=' * 70}\n")
+
+    # 6. Visualize each trajectory
+    print("[6/6] Visualizing trajectories...")
+
+    for i in range(N_SAMPLES):
+        print(f"\n{'=' * 70}")
+        print(f"Trajectory {i + 1}/{N_SAMPLES}")
+        print(f"{'=' * 70}")
+
+        # Convert to numpy array
+        traj_np = sampled_trajs[i].cpu().numpy()
+
+        # Store results (optional)
+        xs = [traj_np[t] for t in range(traj_np.shape[0])]
+        result = store_results(xs, target_xyzquat, rmodel)
+
+        # Visualize
+        visualize_trajectory(
+            robot=robot,
+            trajectory=traj_np,
+            rmodel=rmodel,
+            pause_between_steps=True,
         )
 
-    # 5. Process and Store Results
-    output_dir = pathlib.Path(__file__).parent.parent / "results" / "diffusion_eval"
-    output_dir.mkdir(parents=True, exist_ok=True)
+        if i < N_SAMPLES - 1:
+            input("\nPress Enter to view next trajectory...")
 
-    robot = Robot(
-        pinocchio_model=rmodel,
-        pinocchio_data=rdata,
-        pinocchio_geometry_model=vmodel,
-        pinocchio_geometry_data=vdata,
-    )
-    scene = Scene()
-    scene.add_robot(robot)
-    o = Object.create_mesh(
-        path_to_mesh=obj_file,
-        name="robot/movable_obj",
-        scale=1.0,
-    )
-    scene.add_object(o)
-    o.pose = pylone_pose.homogeneous
-
-    goal = Object.create_sphere(radius=0.02, name="goal_sphere", color=[0, 1, 0])
-    scene.add_object(goal)
-    goal.pose = target_se3.homogeneous
+    print("\n" + "=" * 70)
+    print("Visualization complete!")
+    print("=" * 70)
 
 
-    for i in range(n_samples):
-        # Convert torch to list of numpy arrays
-        traj_np = sampled_trajs[i].cpu().numpy()
-        xs = [traj_np[t] for t in range(traj_np.shape[0])]
-        
-        # Use your existing utility to format the JSON entry
-        result = store_results(xs, target_xyzquat, rmodel)
-        results.append(result)
-
-    for x in xs:
-        q = x[: rmodel.nq]
-        robot[:] = q
-        input("Press Enter to continue...")
+if __name__ == "__main__":
+    main()

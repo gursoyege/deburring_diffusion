@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pinocchio as pin
 import torch
+from robomeshcat import Object, Robot, Scene
 
 from deburring_diffusion.diffusion.model import Model
 from deburring_diffusion.robot.panda_env_loader import load_reduced_panda
@@ -23,7 +24,8 @@ def setup_environment() -> tuple:
     rmodel, cmodel, vmodel = load_reduced_panda()
     rdata = rmodel.createData()
     vdata = vmodel.createData()
-    return rmodel, rdata, vmodel, vdata
+    cdata = cmodel.createData()
+    return rmodel, rdata, cmodel, cdata, vmodel, vdata
 
 
 def load_diffusion_model(checkpoint_path: str) -> Model:
@@ -185,3 +187,84 @@ def plot_trajectories(
     plt.close()
 
     print(f"Plot saved to {output_path}")
+
+
+def setup_scene(
+    rmodel: pin.Model,
+    rdata: pin.Data,
+    vmodel: pin.GeometryModel,
+    vdata: pin.GeometryData,
+    obj_file: pathlib.Path,
+    target_se3: pin.SE3,
+    pylone_pose: pin.SE3,
+) -> tuple[Scene, Robot]:
+    """Setup MeshCat scene with robot and objects.
+
+    Args:
+        rmodel: Robot model
+        rdata: Robot data
+        vmodel: Visual model
+        vdata: Visual data
+        obj_file: Path to pylone mesh file
+        target_se3: Target end-effector pose
+        pylone_pose: Pylone object pose
+
+    Returns:
+        Tuple of (scene, robot)
+    """
+    # Create robot
+    robot = Robot(
+        pinocchio_model=rmodel,
+        pinocchio_data=rdata,
+        pinocchio_geometry_model=vmodel,
+        pinocchio_geometry_data=vdata,
+    )
+
+    # Create scene
+    scene = Scene()
+    scene.add_robot(robot)
+
+    # Add pylone object
+    pylone = Object.create_mesh(
+        path_to_mesh=obj_file,
+        name="robot/movable_obj",
+        scale=1.0,
+    )
+    scene.add_object(pylone)
+    pylone.pose = pylone_pose.homogeneous
+
+    # Add goal sphere
+    goal = Object.create_sphere(
+        radius=0.02,
+        name="goal_sphere",
+        color=[0, 1, 0],  # Green with transparency
+    )
+    scene.add_object(goal)
+    goal.pose = target_se3.homogeneous
+
+    return scene, robot
+
+
+def visualize_trajectory(
+    robot: Robot,
+    trajectory: np.ndarray,
+    rmodel: pin.Model,
+    pause_between_steps: bool = True,
+) -> None:
+    """Visualize a single trajectory in MeshCat.
+
+    Args:
+        robot: Robot object
+        trajectory: Trajectory as numpy array (seq_length, config_size)
+        rmodel: Robot model
+        pause_between_steps: If True, pause after each step
+    """
+    print(f"\nVisualizing trajectory with {len(trajectory)} steps")
+    print("Press Enter to advance through trajectory...")
+
+    for step_idx, q in enumerate(trajectory):
+        # Update robot configuration
+        robot[:] = q[: rmodel.nq]
+
+        if pause_between_steps:
+            input(f"Step {step_idx + 1}/{len(trajectory)} - Press Enter to continue...")

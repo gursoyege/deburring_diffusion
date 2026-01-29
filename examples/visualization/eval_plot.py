@@ -42,7 +42,7 @@ def main() -> None:
 
     # 1. Setup environment
     print("Setting up environment...")
-    rmodel, rdata, _, _ = setup_environment()
+    rmodel, rdata, _, _, _, _ = setup_environment()
 
     # 2. Load diffusion model
     print("Loading diffusion model...")
