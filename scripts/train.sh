@@ -1,1 +1,1 @@
-python ../src/deburring_diffusion/diffusion/train.py fit --config config/diffusion_config.yml
+python /workspaces/deburring_diffusion/src/deburring_diffusion/diffusion/train.py fit --config /workspaces/deburring_diffusion/scripts/config/diffusion_config.yml
