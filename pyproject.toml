@@ -3,7 +3,7 @@ requires = ["uv_build>=0.8.2,<0.9.0"]
 build-backend = "uv_build"
 
 [project]
-authors = [{ name = "anon", email = "arthur.haffemayer@gmail.com" }]
+authors = [{ name = "Arthur Haffemayer", email = "arthur.haffemayer@gmail.com" }]
 name = "deburring_diffusion"
 version = "0.1.0"
 description = "Panda robot following an path obtained through diffusion to do a deburring motion."
