@@ -26,19 +26,39 @@ from deburring_diffusion.robot.visualization_utils import (
 CHECKPOINT_PATH = (
     # "/workspaces/deburring_diffusion/results/diffusion/"
     # # "lightning_logs/version_0/checkpoints/epoch=99-step=700.ckpt" This is for single goal single conf
-    "/workspaces/deburring_diffusion/results/diffusion/lightning_logs/version_1/checkpoints/epoch=499-step=19000.ckpt"
+    # "/workspaces/deburring_diffusion/results/diffusion/lightning_logs/version_1/checkpoints/epoch=499-step=19000.ckpt"
+    "/workspaces/deburring_diffusion/results/diffusion/lightning_logs/version_2/checkpoints/epoch=603-step=732048.ckpt"
 )
 
 
 MODEL_PATH = pathlib.Path("/workspaces/deburring_diffusion/models")
 OBJ_FILE = MODEL_PATH / "pylone.obj"
 
-Q_START = np.array([0.0, -0.4, 0.0, -0.2, 0.0, 1.57, 0.79])
-TARGET_POSITION = np.array([0.35, 0.4, 0.7])
+# Q_START = np.array([0.0, -0.4, 0.0, -0.2, 0.0, 1.57, 0.79])
 PYLONE_POSE = pin.XYZQUATToSE3([0.45, -0.116, 0.739, 0.0, 0.0, 0.0, 1.0])
 
 N_SAMPLES = 5
 SEQ_LENGTH = 50
+
+x_lim = np.array([-0.7, 0.7])
+y_lim = np.array([-0.7, 0.7])
+z_lim = np.array([-0.3, 1])
+
+# TARGET_TRANSLATION = np.array(
+# [
+# np.random.uniform(x_lim[0], x_lim[1]),
+# np.random.uniform(y_lim[0], y_lim[1]),
+# np.random.uniform(z_lim[0], z_lim[1]),
+# ]
+# )
+TARGET_TRANSLATION = np.array([0.35, 0.2, 0.7])
+
+# rot = np.random.randn(3)
+rot = np.array([0.5, 0.7, 0])
+TARGET_ROTATION = pin.exp3(rot)
+TARGET_POSITION = pin.SE3(TARGET_ROTATION, TARGET_TRANSLATION)
+
+TARGET_POSITION_QUAT = pin.SE3ToXYZQUAT(TARGET_POSITION)
 
 
 def main() -> None:
@@ -53,14 +73,12 @@ def main() -> None:
 
     # 2. Setup target and conditioning
     print("[2/6] Preparing target and conditioning...")
-    target_se3 = pin.SE3(np.eye(3), TARGET_POSITION)
-    target_xyzquat = pin.SE3ToXYZQUAT(target_se3)
-
     Q_START = pin.randomConfiguration(rmodel)
+    # TARGET_POSITION =
 
     cond_dict = prepare_conditioning(
         q_start=Q_START,
-        target_se3=target_se3,
+        target_se3=TARGET_POSITION,
     )
 
     # 3. Load diffusion model
@@ -85,7 +103,7 @@ def main() -> None:
         vmodel=vmodel,
         vdata=vdata,
         obj_file=OBJ_FILE,
-        target_se3=target_se3,
+        target_se3=TARGET_POSITION,
         pylone_pose=PYLONE_POSE,
     )
     robot[:] = Q_START
@@ -113,7 +131,7 @@ def main() -> None:
 
         # Store results (optional)
         xs = [traj_np[t] for t in range(traj_np.shape[0])]
-        result = store_results(xs, target_xyzquat, rmodel)
+        result = store_results(xs, TARGET_POSITION_QUAT, rmodel)
 
         # Visualize
         visualize_trajectory(

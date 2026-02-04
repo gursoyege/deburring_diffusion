@@ -1,5 +1,5 @@
 data:
-  data_file: /workspaces/deburring_diffusion/results/traj_generator/multiple_configuration_single_single_pose.json
+  data_file: /workspaces/deburring_diffusion/results/traj_generator/multiple_configuration_multiple_poses.json
 trainer:
-  max_epochs: 500
+  max_epochs: 1000
   default_root_dir: /workspaces/deburring_diffusion/results/diffusion
